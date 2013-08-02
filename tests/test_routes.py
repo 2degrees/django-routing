@@ -15,10 +15,12 @@
 #
 ##############################################################################
 
+from nose.tools import assert_not_equal
 from nose.tools import eq_
 
 from django_routing.routes import BaseRoute
 from django_routing.routes import DuplicatedRouteNameError
+from django_routing.routes import InvalidSpecializationError
 from django_routing.routes import NonExistingRouteError
 
 from tests.assertions import assert_raises_substring
@@ -45,9 +47,9 @@ class TestBaseRoute(object):
         route = BaseRoute(_FAKE_VIEW, _FAKE_ROUTE_NAME)
         eq_(_FAKE_ROUTE_NAME, route.get_name())
 
-    def test_name_getter_without_name(self):
-        route = BaseRoute(None, None)
-        eq_(None, route.get_name())
+    def test_get_view(self):
+        route = BaseRoute(_FAKE_VIEW, _FAKE_ROUTE_NAME)
+        eq_(_FAKE_VIEW, route.get_view())
 
 
 class TestRouteRetrieval(object):
@@ -164,6 +166,83 @@ class TestInitializationValidation(object):
                 _FAKE_ROUTE_NAME,
                 (conflicting_sub_route_1, conflicting_sub_route_2),
                 )
+
+
+class TestSpecialization(object):
+
+    def test_reference(self):
+        route = BaseRoute(_FAKE_VIEW, _FAKE_ROUTE_NAME, _FAKE_SUB_ROUTES)
+        specialized_route = route.create_specialization()
+        assert_not_equal(route, specialized_route)
+
+    def test_no_change(self):
+        route = BaseRoute(_FAKE_VIEW, _FAKE_ROUTE_NAME, _FAKE_SUB_ROUTES)
+        specialized_route = route.create_specialization()
+
+        eq_(_FAKE_ROUTE_NAME, specialized_route.get_name())
+        eq_(_FAKE_VIEW, specialized_route.get_view())
+        eq_(_FAKE_SUB_ROUTES, tuple(specialized_route))
+
+    def test_additional_sub_routes(self):
+        route = BaseRoute(_FAKE_VIEW, _FAKE_ROUTE_NAME, _FAKE_SUB_ROUTES)
+        additional_route = BaseRoute(_FAKE_VIEW, 'new_name')
+        specialized_route = route.create_specialization(
+            additional_sub_routes=additional_route,
+            )
+
+        specialized_route_sub_routes = _FAKE_SUB_ROUTES + (additional_route,)
+
+        eq_(specialized_route_sub_routes, tuple(specialized_route))
+
+    def test_additional_sub_route_with_duplicated_name(self):
+        assert 0
+
+    def test_specializing_sub_routes(self):
+        original_sub_route = BaseRoute(None, None)
+        original_route = BaseRoute(
+            _FAKE_VIEW,
+            _FAKE_ROUTE_NAME,
+            [original_sub_route],
+            )
+        specialized_sub_route = original_sub_route.create_specialization()
+        specialized_route = original_route.create_specialization(
+            specialized_sub_routes=[specialized_sub_route],
+            )
+
+        eq_((specialized_sub_route,), tuple(specialized_route))
+
+    def test_specializing_sub_route_with_non_specialized_route(self):
+        original_sub_route = BaseRoute(None, None)
+        original_route = BaseRoute(
+            _FAKE_VIEW,
+            _FAKE_ROUTE_NAME,
+            [original_sub_route],
+            )
+        unspecialized_route_name = 'unspecialized_route_name'
+        unspecialized_route = BaseRoute(None, unspecialized_route_name)
+
+        with assert_raises_substring(
+            InvalidSpecializationError,
+            unspecialized_route_name,
+            ):
+            original_route.create_specialization(
+                specialized_sub_routes=[unspecialized_route],
+                )
+
+    def test_overriding_views(self):
+        assert 0
+
+    def test_overriding_non_existing_views(self):
+        assert 0
+
+    def test_getting_name_of_specialization(self):
+        assert 0
+
+    def test_getting_route_by_name(self):
+        assert 0
+
+    def test_specializing_specializations(self):
+        assert 0
 
 
 _FAKE_VIEW = object()

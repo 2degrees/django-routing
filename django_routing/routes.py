@@ -30,6 +30,10 @@ class NonExistingRouteError(RoutingException):
     pass
 
 
+class InvalidSpecializationError(RoutingException):
+    pass
+
+
 class BaseRoute(object):
 
     __metaclass__ = ABCMeta
@@ -87,6 +91,9 @@ class BaseRoute(object):
     def get_name(self):
         return self._name
 
+    def get_view(self):
+        return self._view
+
     def _add_sub_route(self, sub_route):
         self._validate_new_sub_route_name(sub_route)
         self._sub_routes.append(sub_route)
@@ -113,3 +120,12 @@ class BaseRoute(object):
             route_names.extend(sub_route_names)
 
         return route_names
+
+    def create_specialization(
+        self,
+        additional_sub_routes=(),
+        specialized_sub_routes=(),
+        views_by_route_name=None,
+        ):
+        return self
+
