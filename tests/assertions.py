@@ -14,3 +14,10 @@
 # INFRINGEMENT, AND FITNESS FOR A PARTICULAR PURPOSE.
 #
 ##############################################################################
+
+from nose.tools import assert_raises_regexp
+
+
+def assert_raises_substring(exception_class, exception_message_substring):
+    exception_message_regex = '^.*{}.*$'.format(exception_message_substring)
+    return assert_raises_regexp(exception_class, exception_message_regex)
