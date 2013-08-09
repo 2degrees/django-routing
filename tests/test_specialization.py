@@ -33,11 +33,13 @@ class TestSpecialization(object):
     def test_repr(self):
         generalized_route = \
             BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
-        specialized_route = generalized_route.create_specialization()
-        expected_repr = 'BaseRoute({!r}, {!r}, {!r})'.format(
-            FAKE_VIEW,
-            FAKE_ROUTE_NAME,
-            FAKE_SUB_ROUTES,
+
+        view = object()
+        specialized_route = generalized_route.create_specialization(view)
+
+        expected_repr = '<Specialization of {!r} with view {!r}>'.format(
+            generalized_route,
+            view,
             )
         eq_(expected_repr, repr(specialized_route))
 

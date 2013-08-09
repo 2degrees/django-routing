@@ -54,13 +54,19 @@ class BaseRoute(object):
             self._add_sub_route(sub_route)
 
     def __repr__(self):
-        route_class_name = self.__class__.__name__
-        repr_ = '{class_name}({view!r}, {name!r}, {sub_routes!r})'.format(
-            class_name=route_class_name,
-            name=self.get_name(),
-            view=self.get_view(),
-            sub_routes=tuple(self),
-            )
+        if self._is_specialization:
+            repr_ = '<Specialization of {!r} with view {!r}>'.format(
+                self._generalized_route,
+                self._view,
+                )
+        else:
+            route_class_name = self.__class__.__name__
+            repr_ = '{class_name}({view!r}, {name!r}, {sub_routes!r})'.format(
+                class_name=route_class_name,
+                name=self.get_name(),
+                view=self.get_view(),
+                sub_routes=tuple(self),
+                )
         return repr_
 
     def __eq__(self, other):
