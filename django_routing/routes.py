@@ -231,14 +231,6 @@ class BaseRoute(object):
         for specialized_sub_route in specialized_sub_routes:
             specialization._add_specialized_sub_route(specialized_sub_route)
 
-        specialized_sub_route_names = []
-        for sub_route in specialized_sub_routes:
-            specialized_sub_route_names.extend(sub_route._get_route_names())
-
-        additional_sub_route_names = []
-        for sub_route in additional_sub_routes:
-            additional_sub_route_names.extend(sub_route._get_route_names())
-
         return specialization
 
     def _add_specialized_sub_route(self, specialized_sub_route):
