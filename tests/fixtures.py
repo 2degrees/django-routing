@@ -26,5 +26,5 @@ FAKE_ROUTE_NAME = 'name_of_route'
 
 FAKE_SUB_ROUTES = (
     BaseRoute(None, None),
-    BaseRoute(None, None),
+    BaseRoute(None, 'sub_route_2'),
     )

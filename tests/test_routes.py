@@ -15,15 +15,15 @@
 #
 ##############################################################################
 
-from nose.tools import assert_false
-from nose.tools import assert_not_equal
 from nose.tools import eq_
 from nose.tools import ok_
 
 from django_routing.routes import BaseRoute
-from django_routing.routes import DuplicatedRouteNameError
+from django_routing.routes import DuplicatedRouteError
 from django_routing.routes import NonExistingRouteError
 
+from tests.assertions import assert_equivalent
+from tests.assertions import assert_non_equivalent
 from tests.assertions import assert_raises_substring
 from tests.fixtures import FAKE_ROUTE_NAME
 from tests.fixtures import FAKE_SUB_ROUTES
@@ -47,7 +47,7 @@ class TestBaseRoute(object):
 
         eq_(FAKE_SUB_ROUTES, sub_routes)
 
-    def test_len(self):
+    def test_length(self):
         route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
         eq_(len(FAKE_SUB_ROUTES), len(route))
 
@@ -64,130 +64,33 @@ class TestBaseRoute(object):
         eq_(FAKE_VIEW, route.get_view())
 
 
-class TestBaseRouteEquality(object):
-
-    def _assert_equivalent_routes(self, route_1, route_2):
-        ok_(route_1 == route_2)
-        assert_false(route_1 != route_2)
-
-        ok_(route_2 == route_1)
-        assert_false(route_2 != route_1)
-
-    def _assert_non_equivalent_routes(self, route_1, route_2):
-        ok_(route_1 != route_2)
-        assert_false(route_1 == route_2)
-
-        ok_(route_2 != route_1)
-        assert_false(route_2 == route_1)
+class TestEquality(object):
 
     def test_routes_with_same_attributes(self):
         route_1 = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
         route_2 = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
 
-        self._assert_equivalent_routes(route_1, route_2)
+        assert_equivalent(route_1, route_2)
 
     def test_routes_with_different_attributes(self):
-        self._assert_non_equivalent_routes(
+        assert_non_equivalent(
             BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
             BaseRoute(object(), FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
             )
-        self._assert_non_equivalent_routes(
+        assert_non_equivalent(
             BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
             BaseRoute(FAKE_VIEW, 'another_name', FAKE_SUB_ROUTES),
             )
-        self._assert_non_equivalent_routes(
+        assert_non_equivalent(
             BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
             BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, []),
             )
 
     def test_non_route(self):
-        self._assert_non_equivalent_routes(
+        assert_non_equivalent(
             BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
             None,
             )
-
-    def test_sibling_specializations_with_same_attributes(self):
-        generalized_route = BaseRoute(
-            FAKE_VIEW,
-            FAKE_ROUTE_NAME,
-            FAKE_SUB_ROUTES,
-            )
-
-        specialized_route_1 = generalized_route.create_specialization()
-        specialized_route_2 = generalized_route.create_specialization()
-
-        self._assert_equivalent_routes(specialized_route_1, specialized_route_2)
-
-    def test_sibling_specializations_with_different_attributes(self):
-        generalized_route = BaseRoute(
-            None,
-            FAKE_ROUTE_NAME,
-            FAKE_SUB_ROUTES,
-            )
-
-        specialized_route_1 = \
-            generalized_route.create_specialization(FAKE_VIEW)
-        specialized_route_2 = generalized_route.create_specialization()
-
-        self._assert_non_equivalent_routes(
-            specialized_route_1,
-            specialized_route_2,
-            )
-
-    def test_sibling_specializations_with_same_specialized_sub_routes(self):
-        generalized_sub_route = BaseRoute(None, None, FAKE_SUB_ROUTES)
-        generalized_route = BaseRoute(
-            FAKE_VIEW,
-            FAKE_ROUTE_NAME,
-            [generalized_sub_route],
-            )
-
-        specialized_sub_route_1 = generalized_sub_route.create_specialization()
-        specialized_route_1 = generalized_route.create_specialization(
-            specialized_sub_routes=[specialized_sub_route_1],
-            )
-
-        specialized_sub_route_2 = generalized_sub_route.create_specialization()
-        specialized_route_2 = generalized_route.create_specialization(
-            specialized_sub_routes=[specialized_sub_route_2],
-            )
-
-        self._assert_equivalent_routes(specialized_route_1, specialized_route_2)
-
-    def test_specializations_from_equivalent_generalizations(self):
-        generalized_route_1 = BaseRoute(
-            None,
-            FAKE_ROUTE_NAME,
-            FAKE_SUB_ROUTES,
-            )
-        specialized_route_1 = generalized_route_1.create_specialization()
-
-        generalized_route_2 = BaseRoute(
-            None,
-            FAKE_ROUTE_NAME,
-            FAKE_SUB_ROUTES,
-            )
-        specialized_route_2 = generalized_route_2.create_specialization()
-
-        self._assert_equivalent_routes(
-            specialized_route_1,
-            specialized_route_2,
-            )
-
-    def test_specialization_vs_non_specialization(self):
-        generalized_route = BaseRoute(None, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
-        specialized_route = generalized_route.create_specialization()
-
-        route = BaseRoute(None, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
-
-        self._assert_non_equivalent_routes(specialized_route, route)
-
-    def test_generalization_vs_specialization(self):
-        generalized_route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
-
-        specialized_route = generalized_route.create_specialization()
-
-        self._assert_non_equivalent_routes(generalized_route, specialized_route)
 
 
 class TestRouteRetrieval(object):
@@ -245,47 +148,47 @@ class TestInitializationValidation(object):
 
     def test_sibling_sub_routes_with_duplicated_names(self):
         duplicated_route_name = 'sub_route_1'
+        sub_route_1 = BaseRoute(FAKE_VIEW, duplicated_route_name)
+        sub_route_2 = BaseRoute(FAKE_VIEW, duplicated_route_name)
         with assert_raises_substring(
-            DuplicatedRouteNameError,
+            DuplicatedRouteError,
             duplicated_route_name,
             ):
-            BaseRoute(
-                FAKE_VIEW,
-                FAKE_ROUTE_NAME,
-                (
-                    BaseRoute(FAKE_VIEW, duplicated_route_name),
-                    BaseRoute(FAKE_VIEW, duplicated_route_name),
-                    ),
-                )
+            BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, (sub_route_1, sub_route_2))
+
+    def test_equivalent_sibling_sub_routes_without_names(self):
+        sub_route_1 = BaseRoute(FAKE_VIEW, None)
+        sub_route_2 = BaseRoute(FAKE_VIEW, None)
+        with assert_raises_substring(
+            DuplicatedRouteError,
+            'Duplicated unnamed sub-route',
+            ):
+            BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, (sub_route_1, sub_route_2))
 
     def test_sub_route_duplicating_direct_ancestor_name(self):
         duplicated_route_name = 'route_name'
+        sub_route = BaseRoute(FAKE_VIEW, duplicated_route_name)
         with assert_raises_substring(
-            DuplicatedRouteNameError,
+            DuplicatedRouteError,
             duplicated_route_name,
             ):
-            BaseRoute(
-                FAKE_VIEW,
-                duplicated_route_name,
-                [BaseRoute(FAKE_VIEW, duplicated_route_name)],
-                )
+            BaseRoute(FAKE_VIEW, duplicated_route_name, [sub_route])
 
     def test_sub_route_duplicating_indirect_ancestor_name(self):
         duplicated_route_name = 'route_name'
+        intermediate_sub_route = BaseRoute(
+            None,
+            None,
+            [BaseRoute(FAKE_VIEW, duplicated_route_name)],
+            )
         with assert_raises_substring(
-            DuplicatedRouteNameError,
+            DuplicatedRouteError,
             duplicated_route_name,
             ):
             BaseRoute(
                 FAKE_VIEW,
                 duplicated_route_name,
-                [
-                    BaseRoute(
-                        None,
-                        None,
-                        [BaseRoute(FAKE_VIEW, duplicated_route_name)],
-                        ),
-                    ],
+                [intermediate_sub_route],
                 )
 
     def test_sub_route_duplicating_cousin_name(self):
@@ -294,9 +197,8 @@ class TestInitializationValidation(object):
 
         conflicting_sub_route_1 = BaseRoute(None, None, [duplicated_sub_route])
         conflicting_sub_route_2 = BaseRoute(None, None, [duplicated_sub_route])
-
         with assert_raises_substring(
-            DuplicatedRouteNameError,
+            DuplicatedRouteError,
             duplicated_route_name,
             ):
             BaseRoute(

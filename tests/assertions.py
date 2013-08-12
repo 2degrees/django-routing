@@ -15,9 +15,27 @@
 #
 ##############################################################################
 
+from nose.tools import assert_false
 from nose.tools import assert_raises_regexp
+from nose.tools import ok_
 
 
 def assert_raises_substring(exception_class, exception_message_substring):
     exception_message_regex = '^.*{}.*$'.format(exception_message_substring)
     return assert_raises_regexp(exception_class, exception_message_regex)
+
+
+def assert_equivalent(object_1, object_2):
+    ok_(object_1 == object_2)
+    assert_false(object_1 != object_2)
+
+    ok_(object_2 == object_1)
+    assert_false(object_2 != object_1)
+
+
+def assert_non_equivalent(object_1, object_2):
+    ok_(object_1 != object_2)
+    assert_false(object_1 == object_2)
+
+    ok_(object_2 != object_1)
+    assert_false(object_2 == object_1)

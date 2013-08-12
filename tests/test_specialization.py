@@ -17,11 +17,14 @@
 
 from nose.tools import assert_not_equal
 from nose.tools import eq_
+from nose.tools import ok_
 
 from django_routing.routes import BaseRoute
-from django_routing.routes import DuplicatedRouteNameError
+from django_routing.routes import DuplicatedRouteError
 from django_routing.routes import InvalidSpecializationError
 
+from tests.assertions import assert_equivalent
+from tests.assertions import assert_non_equivalent
 from tests.assertions import assert_raises_substring
 from tests.fixtures import FAKE_ROUTE_NAME
 from tests.fixtures import FAKE_SUB_ROUTES
@@ -42,6 +45,30 @@ class TestSpecialization(object):
             view,
             )
         eq_(expected_repr, repr(specialized_route))
+
+    def test_length_without_additional_sub_routes(self):
+        generalized_route = \
+            BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
+
+        specialized_route = generalized_route.create_specialization()
+        eq_(len(FAKE_SUB_ROUTES), len(specialized_route))
+
+    def test_length_with_additional_sub_routes(self):
+        generalized_route = \
+            BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
+
+        additional_sub_routes = [BaseRoute(None, 'additional_sub_route')]
+        specialized_route = generalized_route.create_specialization(
+            additional_sub_routes=additional_sub_routes,
+            )
+
+        expected_length = len(FAKE_SUB_ROUTES) + len(additional_sub_routes)
+        eq_(expected_length, len(specialized_route))
+
+    def test_boolean_representation(self):
+        generalized_route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
+        specialized_route = generalized_route.create_specialization()
+        ok_(specialized_route)
 
     def test_reference(self):
         generalized_route = BaseRoute(
@@ -122,9 +149,94 @@ class TestSpecialization(object):
         eq_(expected_sub_routes, tuple(specialized_route))
 
 
+class TestEquality(object):
+
+    def test_sibling_specializations_with_same_attributes(self):
+        generalized_route = BaseRoute(
+            FAKE_VIEW,
+            FAKE_ROUTE_NAME,
+            FAKE_SUB_ROUTES,
+            )
+
+        specialized_route_1 = generalized_route.create_specialization()
+        specialized_route_2 = generalized_route.create_specialization()
+
+        assert_equivalent(specialized_route_1, specialized_route_2)
+
+    def test_sibling_specializations_with_different_attributes(self):
+        generalized_route = BaseRoute(
+            None,
+            FAKE_ROUTE_NAME,
+            FAKE_SUB_ROUTES,
+            )
+
+        specialized_route_1 = \
+            generalized_route.create_specialization(FAKE_VIEW)
+        specialized_route_2 = generalized_route.create_specialization()
+
+        assert_non_equivalent(specialized_route_1, specialized_route_2)
+
+    def test_sibling_specializations_with_same_specialized_sub_routes(self):
+        generalized_sub_route = BaseRoute(None, None, FAKE_SUB_ROUTES)
+        generalized_route = BaseRoute(
+            FAKE_VIEW,
+            FAKE_ROUTE_NAME,
+            [generalized_sub_route],
+            )
+
+        specialized_sub_route_1 = generalized_sub_route.create_specialization()
+        specialized_route_1 = generalized_route.create_specialization(
+            specialized_sub_routes=[specialized_sub_route_1],
+            )
+
+        specialized_sub_route_2 = generalized_sub_route.create_specialization()
+        specialized_route_2 = generalized_route.create_specialization(
+            specialized_sub_routes=[specialized_sub_route_2],
+            )
+
+        assert_equivalent(specialized_route_1, specialized_route_2)
+
+    def test_specializations_from_equivalent_generalizations(self):
+        generalized_route_1 = BaseRoute(
+            None,
+            FAKE_ROUTE_NAME,
+            FAKE_SUB_ROUTES,
+            )
+        specialized_route_1 = generalized_route_1.create_specialization()
+
+        generalized_route_2 = BaseRoute(
+            None,
+            FAKE_ROUTE_NAME,
+            FAKE_SUB_ROUTES,
+            )
+        specialized_route_2 = generalized_route_2.create_specialization()
+
+        assert_equivalent(specialized_route_1, specialized_route_2)
+
+    def test_specialization_vs_non_specialization(self):
+        generalized_route = BaseRoute(None, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
+        specialized_route = generalized_route.create_specialization()
+
+        route = BaseRoute(None, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
+
+        assert_non_equivalent(specialized_route, route)
+
+    def test_non_route(self):
+        generalized_route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
+        specialized_route = generalized_route.create_specialization()
+
+        assert_non_equivalent(None, specialized_route)
+
+    def test_generalization_vs_specialization(self):
+        generalized_route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
+        specialized_route = generalized_route.create_specialization()
+
+        assert_non_equivalent(generalized_route, specialized_route)
+
+
 class TestSpecializedSubRoutes(object):
 
-    def test_direct_named_sub_routes(self):
+    def test_existing_named_sub_routes(self):
         generalized_sub_route_name = 'sub_route_name'
         generalized_sub_route = BaseRoute(None, generalized_sub_route_name)
         generalized_route = BaseRoute(
@@ -142,7 +254,7 @@ class TestSpecializedSubRoutes(object):
 
         eq_((specialized_sub_route,), tuple(specialized_route))
 
-    def test_direct_unnamed_sub_routes(self):
+    def test_existing_unnamed_sub_routes(self):
         generalized_sub_route = BaseRoute(FAKE_VIEW, None)
         sub_route = BaseRoute(None, None)
         generalized_route = BaseRoute(
@@ -159,18 +271,35 @@ class TestSpecializedSubRoutes(object):
         # A second sub-route without name shouldn't override the first sub-route
         eq_((specialized_sub_route, sub_route), tuple(specialized_route))
 
-    def test_non_existing_sub_route(self):
+    def test_non_existing_named_sub_route(self):
         generalized_route = BaseRoute(None, None)
 
         non_existing_sub_route_name = 'non_existing_route'
-        sub_route = BaseRoute(None, non_existing_sub_route_name)
+        generalized_sub_route = BaseRoute(None, non_existing_sub_route_name)
+        specialized_sub_route = generalized_sub_route.create_specialization()
 
         with assert_raises_substring(
             InvalidSpecializationError,
             non_existing_sub_route_name,
             ):
             generalized_route.create_specialization(
-                specialized_sub_routes=[sub_route],
+                specialized_sub_routes=[specialized_sub_route],
+                )
+
+    def test_non_existing_unnamed_sub_route(self):
+        unnamed_sub_route = BaseRoute(None, None)
+        generalized_route = BaseRoute(None, None, [unnamed_sub_route])
+
+        unnamed_generalized_sub_route = BaseRoute(FAKE_VIEW, None)
+        unnamed_specialized_sub_route = \
+            unnamed_generalized_sub_route.create_specialization()
+
+        with assert_raises_substring(
+            InvalidSpecializationError,
+            'is not specializing a sub-route',
+            ):
+            generalized_route.create_specialization(
+                specialized_sub_routes=[unnamed_specialized_sub_route],
                 )
 
     def test_sub_route_with_non_specialized_route(self):
@@ -204,12 +333,64 @@ class TestSpecializedSubRoutes(object):
                 specialized_sub_routes=[sub_route],
                 )
 
-    def test_specializations(self):
+
+class TestMultipleSpecialization(object):
+
+    def test_no_change(self):
         generalized_route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
         intermediate_route = generalized_route.create_specialization()
         specialized_route = intermediate_route.create_specialization()
 
         eq_(FAKE_ROUTE_NAME, specialized_route.get_name())
+
+    def test_additional_sub_route(self):
+        generalized_route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
+
+        intermediate_route = generalized_route.create_specialization()
+
+        sub_route = BaseRoute(None, None)
+        specialized_route = intermediate_route.create_specialization(
+            additional_sub_routes=[sub_route],
+            )
+
+        eq_((sub_route,), tuple(specialized_route))
+
+    def test_additional_duplicated_sub_route(self):
+        sub_route_1 = BaseRoute(None, FAKE_ROUTE_NAME)
+        generalized_route = BaseRoute(FAKE_VIEW, None, [sub_route_1])
+
+        intermediate_route = generalized_route.create_specialization()
+
+        sub_route_2 = BaseRoute(None, FAKE_ROUTE_NAME)
+        with assert_raises_substring(DuplicatedRouteError, FAKE_ROUTE_NAME):
+            intermediate_route.create_specialization(
+                additional_sub_routes=[sub_route_2],
+                )
+
+    def test_specializing_sub_route(self):
+        generalized_sub_route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
+        generalized_route = BaseRoute(None, None, [generalized_sub_route])
+
+        intermediate_route = generalized_route.create_specialization()
+
+        specialized_sub_route = generalized_sub_route.create_specialization()
+        specialized_route = intermediate_route.create_specialization(
+            specialized_sub_routes=[specialized_sub_route],
+            )
+
+        eq_((specialized_sub_route,), tuple(specialized_route))
+
+    def test_specializing_invalid_sub_route(self):
+        sub_route_1 = BaseRoute(None, FAKE_ROUTE_NAME)
+        generalized_route = BaseRoute(FAKE_VIEW, None, [sub_route_1])
+
+        intermediate_route = generalized_route.create_specialization()
+
+        sub_route_2 = BaseRoute(None, FAKE_ROUTE_NAME)
+        with assert_raises_substring(InvalidSpecializationError, FAKE_ROUTE_NAME):
+            intermediate_route.create_specialization(
+                specialized_sub_routes=[sub_route_2],
+                )
 
 
 class TestAdditionalSubRoutes(object):
@@ -234,7 +415,7 @@ class TestAdditionalSubRoutes(object):
         generalized_route = BaseRoute(FAKE_VIEW, duplicated_route_name)
         sub_route = BaseRoute(FAKE_VIEW, duplicated_route_name)
         with assert_raises_substring(
-            DuplicatedRouteNameError,
+            DuplicatedRouteError,
             duplicated_route_name,
             ):
             generalized_route.create_specialization(
