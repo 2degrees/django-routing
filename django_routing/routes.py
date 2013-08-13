@@ -165,8 +165,8 @@ class BaseRoute(object):
             self._validate_new_unnamed_sub_route(sub_route)
 
     def _validate_new_sub_route_names_recursively(self, sub_route):
-        current_route_names = self._get_route_names()
-        candidate_sub_route_names = sub_route._get_route_names()
+        current_route_names = _get_route_names(self)
+        candidate_sub_route_names = _get_route_names(sub_route)
 
         for candidate_sub_route_name in candidate_sub_route_names:
             if candidate_sub_route_name in current_route_names:
@@ -177,19 +177,6 @@ class BaseRoute(object):
             exc_message = \
                 'Duplicated unnamed sub-route in {!r}'.format(self.get_name())
             raise DuplicatedRouteError(exc_message)
-
-    def _get_route_names(self):
-        route_names = []
-
-        current_route_name = self.get_name()
-        if current_route_name:
-            route_names.append(current_route_name)
-
-        for sub_route in self:
-            sub_route_names = sub_route._get_route_names()
-            route_names.extend(sub_route_names)
-
-        return route_names
 
     def create_specialization(
         self,
@@ -244,7 +231,7 @@ class _RouteSpecialization(object):
     def _validate_specialized_sub_route(self, specialized_sub_route):
         if self._is_route_specialized(specialized_sub_route):
             is_specialization_valid = False
-            for sub_route in chain(self, self._generalized_route):
+            for sub_route in self:
                 if specialized_sub_route._is_specialization_of_route(sub_route):
                     is_specialization_valid = True
                     break
@@ -258,6 +245,17 @@ class _RouteSpecialization(object):
                     self.get_name(),
                     )
             raise InvalidSpecializationError(exc_message)
+
+        current_specialization_names = set(_get_route_names(self)) - \
+            set(_get_route_names(self._generalized_route))
+
+        candidate_sub_route_names = \
+            _get_route_names(specialized_sub_route)
+
+        for candidate_sub_route_name in candidate_sub_route_names:
+            if candidate_sub_route_name in current_specialization_names:
+                raise InvalidSpecializationError(candidate_sub_route_name)
+
 
     def __repr__(self):
         repr_ = '<Specialization of {!r} with view {!r}>'.format(
@@ -415,3 +413,17 @@ def _get_sub_route_by_name(route, route_name):
             break
 
     return matching_sub_route
+
+
+def _get_route_names(route):
+    route_names = []
+
+    current_route_name = route.get_name()
+    if current_route_name:
+        route_names.append(current_route_name)
+
+    for sub_route in route:
+        sub_route_names = _get_route_names(sub_route)
+        route_names.extend(sub_route_names)
+
+    return route_names
