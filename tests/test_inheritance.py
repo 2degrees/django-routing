@@ -65,11 +65,6 @@ class TestSpecialization(object):
         expected_length = len(FAKE_SUB_ROUTES) + len(additional_sub_routes)
         eq_(expected_length, len(specialized_route))
 
-    def test_boolean_representation(self):
-        generalized_route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
-        specialized_route = generalized_route.create_specialization()
-        ok_(specialized_route)
-
     def test_reference(self):
         generalized_route = BaseRoute(
             FAKE_VIEW,

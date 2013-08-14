@@ -43,24 +43,12 @@ class _IRoute(object):
     # TODO: Find better name
 
     @interface_method
-    def __len__(self):
-        pass
-
-    @interface_method
-    def __iter__(self):
-        pass
-
-    @interface_method
     def get_name(self):
-        pass
+        pass  # pragma: no cover
 
     @interface_method
     def get_view(self):
-        pass
-
-    @interface_method
-    def get_route_by_name(self, route_name):
-        pass
+        pass  # pragma: no cover
 
     @interface_method
     def create_specialization(
@@ -69,7 +57,7 @@ class _IRoute(object):
         additional_sub_routes=(),
         specialized_sub_routes=(),
         ):
-        pass
+        pass  # pragma: no cover
 
 
 @implement_interface(_IRoute)
@@ -81,17 +69,24 @@ class BaseRoute(object):
         self._view = view
         self._name = name
 
-        self._sub_routes = []
         for sub_route in sub_routes:
-            self._add_sub_route(sub_route)
+            self._require_sub_route_name_different_from_self(sub_route)
+        self.sub_routes = _RouteCollection(sub_routes)
+
+    def _require_sub_route_name_different_from_self(self, sub_route):
+        sub_route_names = _get_route_names(sub_route)
+        route_name = self.get_name()
+        if route_name in sub_route_names:
+            raise DuplicatedRouteError(route_name)
 
     def __repr__(self):
-        route_class_name = self.__class__.__name__
-        repr_ = '{class_name}({view!r}, {name!r}, {sub_routes!r})'.format(
-            class_name=route_class_name,
+        repr_template = '<{class_name} view={view!r} name={name!r} with ' \
+            '{sub_route_count} sub-routes>'
+        repr_ = repr_template.format(
+            class_name=self.__class__.__name__,
             name=self.get_name(),
             view=self.get_view(),
-            sub_routes=tuple(self),
+            sub_route_count=len(self.sub_routes),
             )
         return repr_
 
@@ -99,7 +94,7 @@ class BaseRoute(object):
         if isinstance(other, self.__class__):
             are_views_equivalent = self.get_view() == other.get_view()
             are_names_equivalent = self.get_name() == other.get_name()
-            are_sub_routes_equivalent = tuple(self) == tuple(other)
+            are_sub_routes_equivalent = self.sub_routes == other.sub_routes
 
             are_routes_equivalent = all((
                 are_views_equivalent,
@@ -119,65 +114,15 @@ class BaseRoute(object):
             are_routes_not_equivalent = not are_routes_equivalent
         return are_routes_not_equivalent
 
-    def __len__(self):
-        # Cannot call tuple() or list() on self because these functions use
-        # len() internally, causing an infinite recursion
-        sub_routes = set(self)
-        sub_routes_count = len(sub_routes)
-        return sub_routes_count
-
-    def __nonzero__(self):
-        return True
-
-    def __iter__(self):
-        return iter(self._sub_routes)
-
-    def get_route_by_name(self, route_name):
-        current_route_name = self.get_name()
-        if current_route_name == route_name:
-            matching_route = self
-        else:
-            matching_route = _get_sub_route_by_name(self, route_name)
-
-        if not matching_route:
-            exc_message = 'Route {!r} does not contain one named {!r}'.format(
-                current_route_name,
-                route_name,
-                )
-            raise NonExistingRouteError(exc_message)
-
-        return matching_route
-
+    # _IRoute
     def get_name(self):
         return self._name
 
+    # _IRoute
     def get_view(self):
         return self._view
 
-    def _add_sub_route(self, sub_route):
-        self._validate_new_sub_route(sub_route)
-        self._sub_routes.append(sub_route)
-
-    def _validate_new_sub_route(self, sub_route):
-        self._validate_new_sub_route_names_recursively(sub_route)
-
-        if not sub_route.get_name():
-            self._validate_new_unnamed_sub_route(sub_route)
-
-    def _validate_new_sub_route_names_recursively(self, sub_route):
-        current_route_names = _get_route_names(self)
-        candidate_sub_route_names = _get_route_names(sub_route)
-
-        for candidate_sub_route_name in candidate_sub_route_names:
-            if candidate_sub_route_name in current_route_names:
-                raise DuplicatedRouteError(candidate_sub_route_name)
-
-    def _validate_new_unnamed_sub_route(self, sub_route):
-        if sub_route in self:
-            exc_message = \
-                'Duplicated unnamed sub-route in {!r}'.format(self.get_name())
-            raise DuplicatedRouteError(exc_message)
-
+    # _IRoute
     def create_specialization(
         self,
         view=None,
@@ -192,6 +137,88 @@ class BaseRoute(object):
             specialized_sub_routes,
             )
         return route_specialization
+
+
+@interface
+class _IRouteCollection(object):
+    # TODO: Find better name
+
+    @interface_method
+    def __len__(self):
+        pass  # pragma: no cover
+
+    @interface_method
+    def __iter__(self):
+        pass  # pragma: no cover
+
+
+@implement_interface(_IRouteCollection)
+class _RouteCollection(object):
+
+    def __init__(self, routes):
+        super(_RouteCollection, self).__init__()
+
+        self._routes = []
+        for route in routes:
+            self._add_route(route)
+
+    def _add_route(self, route):
+        self._validate_new_route(route)
+        self._routes.append(route)
+
+    def _validate_new_route(self, route):
+        self._require_route_names_uniqueness_in_collection(route)
+        if not route.get_name():
+            self._require_uniqueness_of_unnamed_route_in_collection(route)
+
+    def _require_route_names_uniqueness_in_collection(self, route):
+        current_collection_names = []
+        for current_route in self:
+            current_collection_names.extend(_get_route_names(current_route))
+
+        route_names = _get_route_names(route)
+
+        for route_name in route_names:
+            if route_name in current_collection_names:
+                raise DuplicatedRouteError(route_name)
+
+    def _require_uniqueness_of_unnamed_route_in_collection(self, route):
+        if route in self:
+            raise DuplicatedRouteError(repr(route))
+
+    def __repr__(self):
+        repr_ = '{class_name}({routes})'.format(
+            class_name=self.__class__.__name__,
+            routes=self._routes,
+            )
+        return repr_
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            are_routes_equivalent = tuple(self) == tuple(other)
+        else:
+            are_routes_equivalent = NotImplemented
+        return are_routes_equivalent
+
+    def __ne__(self, other):
+        are_routes_equivalent = self.__eq__(other)
+        if are_routes_equivalent == NotImplemented:
+            are_routes_not_equivalent = NotImplemented
+        else:
+            are_routes_not_equivalent = not are_routes_equivalent
+        return are_routes_not_equivalent
+
+    # _IRouteCollection
+    def __len__(self):
+        # Cannot call tuple() or list() on self because these functions use
+        # len() internally, causing an infinite recursion
+        routes = set(self)
+        routes_count = len(routes)
+        return routes_count
+
+    # _IRouteCollection
+    def __iter__(self):
+        return iter(self._routes)
 
 
 @implement_interface(_IRoute)
@@ -268,9 +295,6 @@ class _RouteSpecialization(object):
         generalized_route_length = len(self._generalized_route)
         specialized_route_length = len(self._specialized_route)
         return generalized_route_length + specialized_route_length
-
-    def __nonzero__(self):
-        return True
 
     def __iter__(self):
         generalization_sub_routes = self._get_generalization_sub_routes()
@@ -350,10 +374,12 @@ class _RouteSpecialization(object):
             is_specialization_of_route = False
         return is_specialization_of_route
 
+    # _IRoute
     def get_name(self):
         name = self._generalized_route.get_name()
         return name
 
+    # _IRoute
     def get_view(self):
         specialized_sub_route_view = self._specialized_route.get_view()
         if specialized_sub_route_view:
@@ -363,25 +389,10 @@ class _RouteSpecialization(object):
 
         return view
 
-    def get_route_by_name(self, route_name):
-        current_route_name = self.get_name()
-        if current_route_name == route_name:
-            matching_route = self
-        else:
-            matching_route = _get_sub_route_by_name(self, route_name)
-
-        if not matching_route:
-            exc_message = 'Route {!r} does not contain one named {!r}'.format(
-                current_route_name,
-                route_name,
-                )
-            raise NonExistingRouteError(exc_message)
-
-        return matching_route
-
     def _validate_new_sub_route(self, sub_route):
         self._generalized_route._validate_new_sub_route(sub_route)
 
+    # _IRoute
     def create_specialization(
         self,
         view=None,
@@ -402,11 +413,28 @@ class _RouteSpecialization(object):
         return isinstance(route, cls)
 
 
+def get_route_by_name(route, route_name):
+    current_route_name = route.get_name()
+    if current_route_name == route_name:
+        matching_route = route
+    else:
+        matching_route = _get_sub_route_by_name(route, route_name)
+
+    if not matching_route:
+        exc_message = 'Route {!r} does not contain one named {!r}'.format(
+            current_route_name,
+            route_name,
+            )
+        raise NonExistingRouteError(exc_message)
+
+    return matching_route
+
+
 def _get_sub_route_by_name(route, route_name):
     matching_sub_route = None
-    for sub_route in route:
+    for sub_route in route.sub_routes:
         try:
-            matching_sub_route = sub_route.get_route_by_name(route_name)
+            matching_sub_route = get_route_by_name(sub_route, route_name)
         except NonExistingRouteError:
             pass
         else:
@@ -422,7 +450,7 @@ def _get_route_names(route):
     if current_route_name:
         route_names.append(current_route_name)
 
-    for sub_route in route:
+    for sub_route in route.sub_routes:
         sub_route_names = _get_route_names(sub_route)
         route_names.extend(sub_route_names)
 
