@@ -20,6 +20,8 @@ from abc import abstractmethod
 from abc import abstractproperty
 from itertools import chain
 
+from django_routing._utils import are_objects_inequivalent
+
 
 class RoutingException(Exception):
     pass
@@ -44,6 +46,24 @@ class _BaseRoute(object):
     name = abstractproperty()
 
     view = abstractproperty()
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            are_views_equivalent = self.view == other.view
+            are_names_equivalent = self.name == other.name
+            are_sub_routes_equivalent = self.sub_routes == other.sub_routes
+
+            are_routes_equivalent = all((
+                are_views_equivalent,
+                are_names_equivalent,
+                are_sub_routes_equivalent,
+                ))
+        else:
+            are_routes_equivalent = NotImplemented
+
+        return are_routes_equivalent
+
+    __ne__ = are_objects_inequivalent
 
     def get_route_by_name(self, route_name):
         if self.name == route_name:
@@ -89,14 +109,19 @@ class _BaseRoute(object):
         if route_name in route_names:
             raise DuplicatedRouteError(route_name)
 
-    @abstractmethod
     def create_specialization(
         self,
         view=None,
         additional_sub_routes=(),
         specialized_sub_routes=(),
         ):
-        pass  # pragma: no cover
+        route_specialization = _RouteSpecialization(
+            view,
+            self,
+            additional_sub_routes,
+            specialized_sub_routes,
+            )
+        return route_specialization
 
 
 class Route(_BaseRoute):
@@ -124,30 +149,6 @@ class Route(_BaseRoute):
             )
         return repr_
 
-    def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            are_views_equivalent = self.view == other.view
-            are_names_equivalent = self.name == other.name
-            are_sub_routes_equivalent = self.sub_routes == other.sub_routes
-
-            are_routes_equivalent = all((
-                are_views_equivalent,
-                are_names_equivalent,
-                are_sub_routes_equivalent,
-                ))
-        else:
-            are_routes_equivalent = NotImplemented
-
-        return are_routes_equivalent
-
-    def __ne__(self, other):
-        are_routes_equivalent = self.__eq__(other)
-        if are_routes_equivalent == NotImplemented:
-            are_routes_not_equivalent = NotImplemented
-        else:
-            are_routes_not_equivalent = not are_routes_equivalent
-        return are_routes_not_equivalent
-
     @property
     def name(self):
         return self._name
@@ -156,28 +157,26 @@ class Route(_BaseRoute):
     def view(self):
         return self._view
 
-    def create_specialization(
-        self,
-        view=None,
-        additional_sub_routes=(),
-        specialized_sub_routes=(),
-        ):
-        route_specialization = _RouteSpecialization(
-            view,
-            self,
-            additional_sub_routes,
-            specialized_sub_routes,
-            )
-        return route_specialization
-
 
 class _BaseRouteCollection(object):
 
     __metaclass__ = ABCMeta
 
-    @abstractmethod
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            are_routes_equivalent = tuple(self) == tuple(other)
+        else:
+            are_routes_equivalent = NotImplemented
+        return are_routes_equivalent
+
+    __ne__ = are_objects_inequivalent
+
     def __len__(self):
-        pass  # pragma: no cover
+        # Cannot call tuple() or list() on self because these functions use
+        # len() internally, causing an infinite recursion
+        routes = set(self)
+        routes_count = len(routes)
+        return routes_count
 
     @abstractmethod
     def __iter__(self):
@@ -213,28 +212,6 @@ class _RouteCollection(_BaseRouteCollection):
             routes=self._routes,
             )
         return repr_
-
-    def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            are_routes_equivalent = tuple(self) == tuple(other)
-        else:
-            are_routes_equivalent = NotImplemented
-        return are_routes_equivalent
-
-    def __ne__(self, other):
-        are_routes_equivalent = self.__eq__(other)
-        if are_routes_equivalent == NotImplemented:
-            are_routes_not_equivalent = NotImplemented
-        else:
-            are_routes_not_equivalent = not are_routes_equivalent
-        return are_routes_not_equivalent
-
-    def __len__(self):
-        # Cannot call tuple() or list() on self because these functions use
-        # len() internally, causing an infinite recursion
-        routes = set(self)
-        routes_count = len(routes)
-        return routes_count
 
     def __iter__(self):
         return iter(self._routes)
@@ -272,31 +249,17 @@ class _RouteSpecialization(_BaseRoute):
         return repr_
 
     def __eq__(self, other):
-        if isinstance(other, self.__class__):
+        are_equivalent = super(_RouteSpecialization, self).__eq__(other)
+
+        if are_equivalent != NotImplemented:
             other_generalization = \
                 _RouteSpecialization.get_route_generalization(other)
             are_generalized_routes_equivalent = \
                  self._generalized_route == other_generalization
+            are_equivalent = are_equivalent and \
+                are_generalized_routes_equivalent
 
-            are_views_equivalent = self.view == other.view
-            are_sub_routes_equivalent = self.sub_routes == other.sub_routes
-
-            are_equivalent = all((
-                are_views_equivalent,
-                are_generalized_routes_equivalent,
-                are_sub_routes_equivalent
-                ))
-        else:
-            are_equivalent = NotImplemented
         return are_equivalent
-
-    def __ne__(self, other):
-        are_equivalent = self.__eq__(other)
-        if are_equivalent == NotImplemented:
-            are_not_equivalent = NotImplemented
-        else:
-            are_not_equivalent = not are_equivalent
-        return are_not_equivalent
 
     @property
     def name(self):
@@ -311,20 +274,6 @@ class _RouteSpecialization(_BaseRoute):
             view = self._generalized_route.view
 
         return view
-
-    def create_specialization(
-        self,
-        view=None,
-        additional_sub_routes=(),
-        specialized_sub_routes=(),
-        ):
-        route_specialization = _RouteSpecialization(
-            view,
-            self,
-            additional_sub_routes,
-            specialized_sub_routes,
-            )
-        return route_specialization
 
     @staticmethod
     def get_route_generalization(route):
@@ -407,26 +356,6 @@ class _RouteSpecializationCollection(_BaseRouteCollection):
             self._additional_routes,
             )
         return repr_
-
-    def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            are_routes_equivalent = tuple(self) == tuple(other)
-        else:
-            are_routes_equivalent = NotImplemented
-        return are_routes_equivalent
-
-    def __ne__(self, other):
-        are_routes_equivalent = self.__eq__(other)
-        if are_routes_equivalent == NotImplemented:
-            are_routes_not_equivalent = NotImplemented
-        else:
-            are_routes_not_equivalent = not are_routes_equivalent
-        return are_routes_not_equivalent
-
-    def __len__(self):
-        generalized_route_count = len(self._generalized_routes)
-        additional_route_count = len(self._additional_routes)
-        return generalized_route_count + additional_route_count
 
     def __iter__(self):
         generalized_routes_as_specializations = \
