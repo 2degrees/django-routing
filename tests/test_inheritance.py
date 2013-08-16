@@ -67,6 +67,28 @@ def test_getting_name():
 
 class TestSubRoute(object):
 
+    def test_repr(self):
+        sub_route = BaseRoute(None, 'sub_route_1')
+        generalized_sub_route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
+        generalized_route = \
+            BaseRoute(None, None, [sub_route, generalized_sub_route])
+
+        additional_sub_routes = [BaseRoute(None, 'sub_route_2')]
+        specialized_sub_routes = \
+            [generalized_sub_route.create_specialization(object())]
+        specialized_route = generalized_route.create_specialization(
+            additional_sub_routes=additional_sub_routes,
+            specialized_sub_routes=specialized_sub_routes,
+            )
+
+        expected_repr = \
+            '_RouteSpecializationCollection({!r}, {!r}, {!r})'.format(
+                generalized_route.sub_routes,
+                specialized_sub_routes,
+                additional_sub_routes,
+                )
+        eq_(expected_repr, repr(specialized_route.sub_routes))
+
     def test_length_without_additional_sub_routes(self):
         generalized_route = \
             BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)

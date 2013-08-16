@@ -362,6 +362,15 @@ class _RouteSpecializationCollection(object):
                     'Route {!r} cannot be specialized twice'.format(route)
                     )
 
+    def __repr__(self):
+        repr_ = '{}({!r}, {!r}, {!r})'.format(
+            self.__class__.__name__,
+            self._generalized_routes,
+            self._specialized_routes,
+            self._additional_routes,
+            )
+        return repr_
+
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             are_routes_equivalent = tuple(self) == tuple(other)
