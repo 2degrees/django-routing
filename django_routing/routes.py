@@ -43,11 +43,11 @@ class _IRoute(object):
     # TODO: Find better name
 
     @interface_method
-    def get_name(self):
+    def name(self):
         pass  # pragma: no cover
 
     @interface_method
-    def get_view(self):
+    def view(self):
         pass  # pragma: no cover
 
     @interface_method
@@ -78,16 +78,16 @@ class BaseRoute(object):
             '{sub_route_count} sub-routes>'
         repr_ = repr_template.format(
             class_name=self.__class__.__name__,
-            name=self.get_name(),
-            view=self.get_view(),
+            name=self.name,
+            view=self.view,
             sub_route_count=len(self.sub_routes),
             )
         return repr_
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            are_views_equivalent = self.get_view() == other.get_view()
-            are_names_equivalent = self.get_name() == other.get_name()
+            are_views_equivalent = self.view == other.view
+            are_names_equivalent = self.name == other.name
             are_sub_routes_equivalent = self.sub_routes == other.sub_routes
 
             are_routes_equivalent = all((
@@ -109,11 +109,13 @@ class BaseRoute(object):
         return are_routes_not_equivalent
 
     # _IRoute
-    def get_name(self):
+    @property
+    def name(self):
         return self._name
 
     # _IRoute
-    def get_view(self):
+    @property
+    def view(self):
         return self._view
 
     # _IRoute
@@ -162,7 +164,7 @@ class _RouteCollection(object):
     def _validate_new_route(self, route):
         _require_route_names_uniqueness_in_collection(self, route)
 
-        if not route.get_name():
+        if not route.name:
             self._require_uniqueness_of_unnamed_route_in_collection(route)
 
     def _require_uniqueness_of_unnamed_route_in_collection(self, route):
@@ -214,10 +216,8 @@ class _RouteSpecialization(object):
         additional_sub_routes,
         specialized_sub_routes,
         ):
-
-        generalized_route_name = generalized_route.get_name()
         for sub_route in chain(additional_sub_routes, specialized_sub_routes):
-            _require_route_name_not_in_route(generalized_route_name, sub_route)
+            _require_route_name_not_in_route(generalized_route.name, sub_route)
 
         super(_RouteSpecialization, self).__init__()
         self._view = view
@@ -232,7 +232,7 @@ class _RouteSpecialization(object):
     def __repr__(self):
         repr_ = '<Specialization of {!r} with view {!r}>'.format(
             self._generalized_route,
-            self.get_view(),
+            self.view,
             )
         return repr_
 
@@ -240,7 +240,7 @@ class _RouteSpecialization(object):
         if isinstance(other, self.__class__):
             are_generalized_routes_equivalent = \
                  self._generalized_route == other._generalized_route
-            are_views_equivalent = self.get_view() == other.get_view()
+            are_views_equivalent = self.view == other.view
             are_sub_routes_equivalent = self.sub_routes == other.sub_routes
 
             are_equivalent = all((
@@ -261,16 +261,18 @@ class _RouteSpecialization(object):
         return are_not_equivalent
 
     # _IRoute
-    def get_name(self):
-        name = self._generalized_route.get_name()
+    @property
+    def name(self):
+        name = self._generalized_route.name
         return name
 
     # _IRoute
-    def get_view(self):
+    @property
+    def view(self):
         if self._view:
             view = self._view
         else:
-            view = self._generalized_route.get_view()
+            view = self._generalized_route.view
 
         return view
 
@@ -396,15 +398,14 @@ class _RouteSpecializationCollection(object):
 
 
 def get_route_by_name(route, route_name):
-    current_route_name = route.get_name()
-    if current_route_name == route_name:
+    if route.name == route_name:
         matching_route = route
     else:
         matching_route = _get_sub_route_by_name(route, route_name)
 
     if not matching_route:
         exc_message = 'Route {!r} does not contain one named {!r}'.format(
-            current_route_name,
+            route.name,
             route_name,
             )
         raise NonExistingRouteError(exc_message)
@@ -428,9 +429,8 @@ def _get_sub_route_by_name(route, route_name):
 def _get_route_names(route):
     route_names = []
 
-    current_route_name = route.get_name()
-    if current_route_name:
-        route_names.append(current_route_name)
+    if route.name:
+        route_names.append(route.name)
 
     for sub_route in route.sub_routes:
         sub_route_names = _get_route_names(sub_route)

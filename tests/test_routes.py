@@ -40,11 +40,11 @@ class TestBaseRoute(object):
 
     def test_getting_name(self):
         route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
-        eq_(FAKE_ROUTE_NAME, route.get_name())
+        eq_(FAKE_ROUTE_NAME, route.name)
 
     def test_getting_view(self):
         route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
-        eq_(FAKE_VIEW, route.get_view())
+        eq_(FAKE_VIEW, route.view)
 
 
 class TestEquality(object):

@@ -82,14 +82,14 @@ class TestSpecialization(object):
             )
         specialized_route = generalized_route.create_specialization()
 
-        eq_(FAKE_ROUTE_NAME, specialized_route.get_name())
-        eq_(FAKE_VIEW, specialized_route.get_view())
+        eq_(FAKE_ROUTE_NAME, specialized_route.name)
+        eq_(FAKE_VIEW, specialized_route.view)
         eq_(FAKE_SUB_ROUTES, tuple(specialized_route.sub_routes))
 
     def test_getting_name(self):
         generalized_route = BaseRoute(None, FAKE_ROUTE_NAME)
         specialized_route = generalized_route.create_specialization()
-        eq_(FAKE_ROUTE_NAME, specialized_route.get_name())
+        eq_(FAKE_ROUTE_NAME, specialized_route.name)
 
     #{ Getting routes by name
 
@@ -488,8 +488,8 @@ class TestMultipleSpecialization(object):
         intermediate_route = generalized_route.create_specialization()
         specialized_route = intermediate_route.create_specialization()
 
-        eq_(FAKE_ROUTE_NAME, specialized_route.get_name())
-        eq_(FAKE_VIEW, specialized_route.get_view())
+        eq_(FAKE_ROUTE_NAME, specialized_route.name)
+        eq_(FAKE_VIEW, specialized_route.view)
 
     def test_additional_sub_route(self):
         generalized_route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
@@ -633,7 +633,7 @@ class TestSettingViews(object):
         view = object()
         specialized_route = generalized_route.create_specialization(view=view)
 
-        eq_(view, specialized_route.get_view())
+        eq_(view, specialized_route.view)
 
     def test_previously_set(self):
         generalized_route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
@@ -642,4 +642,4 @@ class TestSettingViews(object):
         specialized_route = \
             generalized_route.create_specialization(view=overridden_view)
 
-        eq_(overridden_view, specialized_route.get_view())
+        eq_(overridden_view, specialized_route.view)
