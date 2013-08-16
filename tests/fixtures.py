@@ -15,7 +15,7 @@
 #
 ##############################################################################
 
-from django_routing.routes import BaseRoute
+from django_routing.routes import Route
 
 
 FAKE_VIEW = object()
@@ -25,6 +25,6 @@ FAKE_ROUTE_NAME = 'name_of_route'
 
 
 FAKE_SUB_ROUTES = (
-    BaseRoute(None, None),
-    BaseRoute(None, 'sub_route_2'),
+    Route(None, None),
+    Route(None, 'sub_route_2'),
     )

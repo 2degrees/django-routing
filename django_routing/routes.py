@@ -15,11 +15,10 @@
 #
 ##############################################################################
 
+from abc import ABCMeta
+from abc import abstractmethod
+from abc import abstractproperty
 from itertools import chain
-
-from interfaces import define as interface
-from interfaces import implement as implement_interface
-from interfaces import require as interface_method
 
 
 class RoutingException(Exception):
@@ -38,19 +37,59 @@ class InvalidSpecializationError(RoutingException):
     pass
 
 
-@interface
-class _IRoute(object):
-    # TODO: Find better name
+class _BaseRoute(object):
 
-    @interface_method
-    def name(self):
-        pass  # pragma: no cover
+    __metaclass__ = ABCMeta
 
-    @interface_method
-    def view(self):
-        pass  # pragma: no cover
+    name = abstractproperty()
 
-    @interface_method
+    view = abstractproperty()
+
+    def get_route_by_name(self, route_name):
+        if self.name == route_name:
+            matching_route = self
+        else:
+            matching_route = self._get_sub_route_by_name(route_name)
+
+        if not matching_route:
+            exc_message = 'self {!r} does not contain one named {!r}'.format(
+                self.name,
+                route_name,
+                )
+            raise NonExistingRouteError(exc_message)
+
+        return matching_route
+
+    def _get_sub_route_by_name(self, route_name):
+        matching_sub_route = None
+        for sub_route in self.sub_routes:
+            try:
+                matching_sub_route = sub_route.get_route_by_name(route_name)
+            except NonExistingRouteError:
+                pass
+            else:
+                break
+
+        return matching_sub_route
+
+    def get_route_names(self):
+        route_names = []
+
+        if self.name:
+            route_names.append(self.name)
+
+        for sub_route in self.sub_routes:
+            sub_route_names = sub_route.get_route_names()
+            route_names.extend(sub_route_names)
+
+        return route_names
+
+    def _require_route_name_not_in_route(self, route_name):
+        route_names = self.get_route_names()
+        if route_name in route_names:
+            raise DuplicatedRouteError(route_name)
+
+    @abstractmethod
     def create_specialization(
         self,
         view=None,
@@ -60,17 +99,18 @@ class _IRoute(object):
         pass  # pragma: no cover
 
 
-@implement_interface(_IRoute)
-class BaseRoute(object):
+class Route(_BaseRoute):
 
     def __init__(self, view, name, sub_routes=()):
-        super(BaseRoute, self).__init__()
+        super(Route, self).__init__()
 
         self._view = view
         self._name = name
 
         for sub_route in sub_routes:
-            _require_route_name_not_in_route(name, sub_route)
+            sub_route._require_route_name_not_in_route(#pylint:disable=W0212
+                name,
+                )
         self.sub_routes = _RouteCollection(sub_routes)
 
     def __repr__(self):
@@ -108,17 +148,14 @@ class BaseRoute(object):
             are_routes_not_equivalent = not are_routes_equivalent
         return are_routes_not_equivalent
 
-    # _IRoute
     @property
     def name(self):
         return self._name
 
-    # _IRoute
     @property
     def view(self):
         return self._view
 
-    # _IRoute
     def create_specialization(
         self,
         view=None,
@@ -134,21 +171,20 @@ class BaseRoute(object):
         return route_specialization
 
 
-@interface
-class _IRouteCollection(object):
-    # TODO: Find better name
+class _BaseRouteCollection(object):
 
-    @interface_method
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
     def __len__(self):
         pass  # pragma: no cover
 
-    @interface_method
+    @abstractmethod
     def __iter__(self):
         pass  # pragma: no cover
 
 
-@implement_interface(_IRouteCollection)
-class _RouteCollection(object):
+class _RouteCollection(_BaseRouteCollection):
 
     def __init__(self, routes):
         super(_RouteCollection, self).__init__()
@@ -193,7 +229,6 @@ class _RouteCollection(object):
             are_routes_not_equivalent = not are_routes_equivalent
         return are_routes_not_equivalent
 
-    # _IRouteCollection
     def __len__(self):
         # Cannot call tuple() or list() on self because these functions use
         # len() internally, causing an infinite recursion
@@ -201,13 +236,11 @@ class _RouteCollection(object):
         routes_count = len(routes)
         return routes_count
 
-    # _IRouteCollection
     def __iter__(self):
         return iter(self._routes)
 
 
-@implement_interface(_IRoute)
-class _RouteSpecialization(object):
+class _RouteSpecialization(_BaseRoute):
 
     def __init__(
         self,
@@ -217,7 +250,9 @@ class _RouteSpecialization(object):
         specialized_sub_routes,
         ):
         for sub_route in chain(additional_sub_routes, specialized_sub_routes):
-            _require_route_name_not_in_route(generalized_route.name, sub_route)
+            sub_route._require_route_name_not_in_route(#pylint:disable=W0212
+                generalized_route.name,
+                )
 
         super(_RouteSpecialization, self).__init__()
         self._view = view
@@ -263,13 +298,11 @@ class _RouteSpecialization(object):
             are_not_equivalent = not are_equivalent
         return are_not_equivalent
 
-    # _IRoute
     @property
     def name(self):
         name = self._generalized_route.name
         return name
 
-    # _IRoute
     @property
     def view(self):
         if self._view:
@@ -279,7 +312,6 @@ class _RouteSpecialization(object):
 
         return view
 
-    # _IRoute
     def create_specialization(
         self,
         view=None,
@@ -299,8 +331,7 @@ class _RouteSpecialization(object):
         return route._generalized_route  #pylint:disable=W0212
 
 
-@implement_interface(_IRouteCollection)
-class _RouteSpecializationCollection(object):
+class _RouteSpecializationCollection(_BaseRouteCollection):
 
     def __init__(
         self,
@@ -328,7 +359,7 @@ class _RouteSpecializationCollection(object):
         self._specialized_routes.append(specialized_route)
 
     def _validate_specialized_route(self, specialized_route):
-        _require_route_to_be_specialization(specialized_route)
+        self._require_route_to_be_specialization(specialized_route)
 
         specialized_route_generalization = \
             _RouteSpecialization.get_route_generalization(specialized_route)
@@ -340,6 +371,12 @@ class _RouteSpecializationCollection(object):
             )
 
         _require_route_names_uniqueness_in_collection(self, specialized_route)
+
+    @staticmethod
+    def _require_route_to_be_specialization(route):
+        if not _is_route_specialized(route):
+            exc_message = 'Route {!r} is not specialized'.format(route)
+            raise InvalidSpecializationError(exc_message)
 
     def _require_generalized_route_in_collection(self, generalized_route):
         for existing_generalized_route in self._generalized_routes:
@@ -418,54 +455,6 @@ class _RouteSpecializationCollection(object):
         return route
 
 
-def get_route_by_name(route, route_name):
-    if route.name == route_name:
-        matching_route = route
-    else:
-        matching_route = _get_sub_route_by_name(route, route_name)
-
-    if not matching_route:
-        exc_message = 'Route {!r} does not contain one named {!r}'.format(
-            route.name,
-            route_name,
-            )
-        raise NonExistingRouteError(exc_message)
-
-    return matching_route
-
-
-def _get_sub_route_by_name(route, route_name):
-    matching_sub_route = None
-    for sub_route in route.sub_routes:
-        try:
-            matching_sub_route = get_route_by_name(sub_route, route_name)
-        except NonExistingRouteError:
-            pass
-        else:
-            break
-
-    return matching_sub_route
-
-
-def _get_route_names(route):
-    route_names = []
-
-    if route.name:
-        route_names.append(route.name)
-
-    for sub_route in route.sub_routes:
-        sub_route_names = _get_route_names(sub_route)
-        route_names.extend(sub_route_names)
-
-    return route_names
-
-
-def _require_route_name_not_in_route(route_name, route):
-    route_names = _get_route_names(route)
-    if route_name in route_names:
-        raise DuplicatedRouteError(route_name)
-
-
 def _is_specialization_of_route(specialized_route, generalized_route):
     if _is_route_specialized(specialized_route):
         specialized_route_generalization = \
@@ -479,12 +468,6 @@ def _is_specialization_of_route(specialized_route, generalized_route):
     return is_specialization_of_route
 
 
-def _require_route_to_be_specialization(route):
-    if not _is_route_specialized(route):
-        exc_message = 'Route {!r} is not specialized'.format(route)
-        raise InvalidSpecializationError(exc_message)
-
-
 def _is_route_specialized(route):
     return isinstance(route, _RouteSpecialization)
 
@@ -492,16 +475,16 @@ def _is_route_specialized(route):
 def _require_route_names_uniqueness_in_collection(route_collection, route):
     route_collection_route_names = []
     for existing_route in route_collection:
-        route_collection_route_names.extend(_get_route_names(existing_route))
+        route_collection_route_names.extend(existing_route.get_route_names())
 
     if _is_route_specialized(route):
         route_generalization = \
             _RouteSpecialization.get_route_generalization(route)
-        generalized_route_names = _get_route_names(route_generalization)
+        generalized_route_names = route_generalization.get_route_names()
     else:
         generalized_route_names = []
 
-    candidate_sub_route_names = _get_route_names(route)
+    candidate_sub_route_names = route.get_route_names()
     for candidate_sub_route_name in candidate_sub_route_names:
         is_sub_route_name_duplicated = \
             candidate_sub_route_name in route_collection_route_names and \

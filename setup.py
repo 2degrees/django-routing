@@ -38,6 +38,6 @@ setup(
     license='BSD (http://dev.2degreesnetwork.com/p/2degrees-license.html)',
     packages=find_packages(exclude=['tests']),
     tests_require=['coverage', 'nose'],
-    install_requires=['interfaces >= 0.0.2'],
+    install_requires=[],
     test_suite='nose.collector',
     )

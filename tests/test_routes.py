@@ -15,9 +15,11 @@
 #
 ##############################################################################
 
+#pylint:disable=R0201
+
 from nose.tools import eq_
 
-from django_routing.routes import BaseRoute
+from django_routing.routes import Route
 
 from tests.assertions import assert_equivalent
 from tests.assertions import assert_non_equivalent
@@ -29,9 +31,9 @@ from tests.fixtures import FAKE_VIEW
 class TestBaseRoute(object):
 
     def test_repr(self):
-        route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
+        route = Route(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
         expected_repr = \
-            '<BaseRoute view={!r} name={!r} with {} sub-routes>'.format(
+            '<Route view={!r} name={!r} with {} sub-routes>'.format(
                 FAKE_VIEW,
                 FAKE_ROUTE_NAME,
                 len(FAKE_SUB_ROUTES),
@@ -39,38 +41,38 @@ class TestBaseRoute(object):
         eq_(expected_repr, repr(route))
 
     def test_getting_name(self):
-        route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
+        route = Route(FAKE_VIEW, FAKE_ROUTE_NAME)
         eq_(FAKE_ROUTE_NAME, route.name)
 
     def test_getting_view(self):
-        route = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME)
+        route = Route(FAKE_VIEW, FAKE_ROUTE_NAME)
         eq_(FAKE_VIEW, route.view)
 
 
 class TestEquality(object):
 
     def test_routes_with_same_attributes(self):
-        route_1 = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
-        route_2 = BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
+        route_1 = Route(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
+        route_2 = Route(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES)
 
         assert_equivalent(route_1, route_2)
 
     def test_routes_with_different_attributes(self):
         assert_non_equivalent(
-            BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
-            BaseRoute(object(), FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
+            Route(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
+            Route(object(), FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
             )
         assert_non_equivalent(
-            BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
-            BaseRoute(FAKE_VIEW, 'another_name', FAKE_SUB_ROUTES),
+            Route(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
+            Route(FAKE_VIEW, 'another_name', FAKE_SUB_ROUTES),
             )
         assert_non_equivalent(
-            BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
-            BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, []),
+            Route(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
+            Route(FAKE_VIEW, FAKE_ROUTE_NAME, []),
             )
 
     def test_non_route(self):
         assert_non_equivalent(
-            BaseRoute(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
+            Route(FAKE_VIEW, FAKE_ROUTE_NAME, FAKE_SUB_ROUTES),
             None,
             )
